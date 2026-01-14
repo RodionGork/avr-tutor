@@ -10,7 +10,11 @@
     #prg td:nth-child(1) { font-size: 85%; font-weight: bold; text-align: center}
     td {padding: 2px}
     tr[cur] { background-color: yellow}
-  </style>
+    #regs td { text-align: center}
+    @media screen and (orientation: portrait) {
+      table { width: 100%}
+    }
+}  </style>
 </head>
 <body>
 <center>
@@ -215,7 +219,10 @@ function tableClick() {
     return;
   value = value.trim();
   if (value === '') {
-    elem.parentElement.remove();
+    if (elem.parentElement.nextElementSibling !== null) {
+      elem.parentElement.remove();
+      recalcAddrs();
+    }
     return;
   }
   elem.innerText = value;
