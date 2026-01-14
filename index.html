@@ -184,7 +184,7 @@ function subReg(which, value, write) {
 function jumpTo(label, cond) {
   var line = findLabel(label);
   if (line < 0)
-    throw 'переход по несуществующей метке';
+    throw 'переход по несуществующей метке ' + label;
   return (cond === undefined || cond) ? line : null;
 }
 
@@ -432,6 +432,36 @@ function checkImm() {
   if (n < 0 || n > 255)
     throw 'нужно значение размером в 1 байт, то есть от 0 до 255' + suff;
 }
+
+window.onbeforeunload = function() {
+  var prg = [];
+  var rows = tableProg.firstElementChild.children;
+  for (var i = 1; i < rows.length; i++) {
+    var line = rows[i].children[1].innerText.trim();
+    if (line != '')
+      prg.push(line);
+  }
+  if (prg.length > 0)
+    localStorage['prg'] = prg.join('\n');
+}
+
+function reloadProgram() {
+  var row = tableProg.firstElementChild.children[1];
+  var lines = localStorage['prg'];
+  if (lines === undefined)
+    return;
+  lines = lines.split('\n');
+  for (var i = 0; i < lines.length; i++) {
+    var value = lines[i];
+    var elem = row.children[1];
+    elem.innerText = value;
+    verifyCodeLine(elem, value);
+    addLine();
+    row = row.nextElementSibling;
+  }
+}
+
+reloadProgram();
 
 </script>
 </body>
