@@ -25,7 +25,7 @@
 </table>
 <br/>
 <button onclick="btnStep()">Step</button>
-<button onclick="btnRun()" disabled="true">Run</button>
+<button id="btnrun" onclick="btnRun()">Run</button>
 <button onclick="btnReset()">Reset</button>
 <h3>Registers</h3>
 <table id="regs" border="1">
@@ -67,10 +67,12 @@ function btnStep(reset) {
     if (reset === undefined) {
       if (firstCmd !== null)
         rows[firstCmd].setAttribute("cur", "true");
-      else
+      else {
         alert('в этой программе нет ни одной исполняемой команды');
+        return false;
+      }
     }
-    return;
+    return true;
   }
   try {
     var jumpLine = execLine(rows[curLine]);
@@ -81,12 +83,33 @@ function btnStep(reset) {
         break;
       }
     }
-    if (nextLine === null)
+    if (nextLine === null) {
       alert('выпали за конец программы');
-    else
+      return false;
+    } else
       rows[nextLine].setAttribute("cur", "true");
   } catch (e) {
     alert('ахтунг: ' + e);
+    return false;
+  }
+  return true;
+}
+
+function btnRun() {
+  var btn = document.getElementById('btnrun');
+  var state = btn.innerText;
+  if (state == 'Run') {
+    btn.innerText = 'Stop';
+    window.runner = function() {
+      if (!btnStep())
+        btnRun();
+      if (window.runner !== undefined)
+        setTimeout(window.runner, 100);
+    }
+    window.runner();
+  } else {
+    btn.innerText = 'Run';
+    window.runner = undefined;
   }
 }
 
