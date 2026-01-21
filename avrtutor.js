@@ -58,8 +58,10 @@ function btnRun() {
     window.runner = function() {
       if (!btnStep())
         btnRun();
-      if (window.runner !== undefined)
-        setTimeout(window.runner, 100);
+      if (window.runner !== undefined) {
+        var delay = parseInt(document.getElementById('run-delay').value);
+        setTimeout(window.runner, (!Number.isNaN(delay) && delay > 0 && delay <= 5000) ? delay : 100);
+      }
     }
     window.runner();
   } else {
