@@ -1,6 +1,6 @@
-
 var tableProg = document.getElementById('prg');
 var tableRegs = document.getElementById('regs');
+var equs = [];
 
 function btnStep(reset) {
   var rows = tableProg.firstElementChild.children;
@@ -83,6 +83,7 @@ function resetState() {
     setPinDir('b', i, 0);
     setPinPort('b', i, 0);
   }
+  equs = [];
 }
 
 var cmdParams = {
@@ -104,16 +105,16 @@ var cmdParams = {
 };
 
 var executors = {
-  'ldi': () => setReg(cmd[1], parseInt(cmd[2])),
+  'ldi': () => setReg(cmd[1], parseIntVal(cmd[2])),
   'mov': () => setReg(cmd[1], getReg(cmd[2])),
   'add': () => addReg(cmd[1], getReg(cmd[2])),
   'adc': () => addReg(cmd[1], getReg(cmd[2]) + getFlag('c')),
   'sub': () => subReg(cmd[1], getReg(cmd[2])),
-  'subi': () => subReg(cmd[1], parseInt(cmd[2])),
+  'subi': () => subReg(cmd[1], parseIntVal(cmd[2])),
   'cp': () => subReg(cmd[1], getReg(cmd[2]), false),
-  'cpi': () => subReg(cmd[1], parseInt(cmd[2]), false),
-  'out': () => portWrite(parseInt(cmd[1]), getReg(cmd[2])),
-  'in': () => setReg(cmd[1], portRead(parseInt(cmd[2]))),
+  'cpi': () => subReg(cmd[1], parseIntVal(cmd[2]), false),
+  'out': () => portWrite(parseIntVal(cmd[1]), getReg(cmd[2])),
+  'in': () => setReg(cmd[1], portRead(parseIntVal(cmd[2]))),
   'rjmp': () => jumpTo(cmd[1]),
   'brlo': () => jumpTo(cmd[1], getFlag('c')),
   'brsh': () => jumpTo(cmd[1], !getFlag('c')),
@@ -138,7 +139,7 @@ function getReg(which) {
   var value = tableRegs.firstElementChild.children[Math.floor(which / 4)].children[which % 4 + 1].innerText;
   if (value == '?')
     throw 'читаем неинициализированный регистр R' + which;
-  return parseInt(value);
+  return parseIntVal(value);
 }
 
 function setFlag(f, value) {
@@ -290,6 +291,7 @@ function tableClick() {
 var verifiers = {
   '.device': deviceVerifier,
   '.org': orgVerifier,
+  '.equ': equVerifier,
   'add': () => twoRegsVerifier('добавляет значение из регистра ' + cmd[2] + ' к регистру ' + cmd[1]),
   'adc': () => twoRegsVerifier('добавляет значение из регистра ' + cmd[2] + ' и флаг переноса (C) к регистру ' + cmd[1]),
   'mov': () => twoRegsVerifier('копирует значение из регистра ' + cmd[2] + ' в регистр ' + cmd[1]),
@@ -333,7 +335,7 @@ function verifyCodeLine(elem, line) {
   elem.nextElementSibling.innerText = text;
   elem.nextElementSibling.style.color = color;
   if (firstWord == '.org')
-    elem.parentElement.setAttribute("org", line.substr(5).trim());
+    elem.parentElement.setAttribute("org", line.replace(/.org\s+/, ''));
   else
     elem.parentElement.removeAttribute("org");
   if (isCmd)
@@ -349,7 +351,7 @@ function recalcAddrs() {
   for (var i = 1; i < rows.length; i++) {
     var org = rows[i].getAttribute('org');
     if (org !== null)
-      cur = parseInt(org);
+      cur = parseIntVal(org);
     if (rows[i].getAttribute('cmd') !== null) {
       rows[i].children[0].innerText = cur;
       cur += 2;
@@ -382,7 +384,20 @@ function deviceVerifier(line) {
 }
 
 function orgVerifier(line) {
-  return 'с какого адреса записывать последующие команды';
+  var parts = line.split(/\s+/);
+  if (parts.length != 2)
+    throw 'нужен один параметр (адрес)';
+  var addr = parseIntVal(parts[1]);
+  if (Number.isNaN(addr) || addr < 0 || addr % 2)
+    throw 'адрес должен быть положительным чётным числом';
+  return 'последующие команды записывать с адреса ' + addr;
+}
+
+function equVerifier(line) {
+  var parts = line.replace(/^\S+\s*/, '').split(/\s*=\s*/);
+  if (parts.length != 2 || parts[0] == '' || parts[1] == '')
+    return 'нужно определение вида "константа = значение"';
+  return 'задаёт константу "' + parts[0] + '" равную ' + parts[1];
 }
 
 function twoRegsVerifier(msg) {
@@ -405,6 +420,19 @@ function findLabel(s) {
       return i;
   }
   return -1;
+}
+
+function findEqu(s) {
+  var rows = tableProg.firstElementChild.children;
+  for (var i = 1; i < rows.length; i++) {
+    var cells = rows[i].children;
+    if (cells[0].innerText == '') {
+      var m = cells[1].innerText.match(/^.equ\s+(\S+)\s*=\s*(\S+)/i);
+      if (m !== null && m[1] == s)
+        return m[2];
+    }
+  }
+  return null;
 }
 
 function jumpVerifier(cond) {
@@ -453,7 +481,7 @@ function checkReg(pos, high) {
 
 function checkPort(pos) {
   var suff = ' (параметр #' + pos + ')';
-  var n = parseInt(cmd[pos]);
+  var n = parseIntVal(cmd[pos]);
   if (Number.isNaN(n))
     throw 'должно быть число' + suff;
   if (n < 0 || n > 63)
@@ -462,14 +490,30 @@ function checkPort(pos) {
 
 function checkImm() {
   var suff = ' (параметр #2)';
-  var n = parseInt(cmd[2]);
+  var n = parseIntVal(cmd[2]);
   if (Number.isNaN(n))
     throw 'должно быть число' + suff;
   if (n < 0 || n > 255)
     throw 'нужно значение размером в 1 байт, то есть от 0 до 255' + suff;
 }
 
-window.onbeforeunload = function() {
+function parseIntVal(v) {
+  var res = v.substr(0, 2).toLowerCase() != '0b' ? parseInt(v) : parseInt(v.substr(2), 2);
+  if (Number.isNaN(res)) {
+    var c = equs[v];
+    if (c === undefined) {
+      c = findEqu(v);
+      if (c != null) {
+        res = parseInt(c);
+        equs[v] = res;
+      }
+    } else
+      res = c;
+  }
+  return res;
+}
+
+function collectCode() {
   var prg = [];
   var rows = tableProg.firstElementChild.children;
   for (var i = 1; i < rows.length; i++) {
@@ -477,8 +521,21 @@ window.onbeforeunload = function() {
     if (line != '')
       prg.push(line);
   }
+  return prg.join('\n');
+}
+
+window.onbeforeunload = function() {
+  var prg = collectCode();
   if (prg.length > 0)
-    localStorage['prg'] = prg.join('\n');
+    localStorage['prg'] = prg;
+}
+
+function beepCodeOut() {
+  var prg = collectCode();
+  var vol = document.getElementById('beep-volume').value;
+  if (Number.isNaN(vol) || vol < 1 || vol > 100)
+    vol = 50;
+  doBeep(prg, vol / 100);
 }
 
 function reloadProgram() {
