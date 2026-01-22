@@ -493,7 +493,7 @@ function checkImm() {
   var n = parseIntVal(cmd[2]);
   if (Number.isNaN(n))
     throw 'должно быть число' + suff;
-  if (n < 0 || n > 255)
+  if (n < -255 || n > 255)
     throw 'нужно значение размером в 1 байт, то есть от 0 до 255' + suff;
 }
 
@@ -509,6 +509,8 @@ function parseIntVal(v) {
       }
     } else
       res = c;
+  } else if (res < 0) {
+      res += 256;
   }
   return res;
 }
