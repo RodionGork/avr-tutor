@@ -79,12 +79,30 @@ function resetState() {
     setReg('r' + i, '?');
   setFlag('c', '?');
   setFlag('z', '?');
-  for (var i = 0; i < 8; i++) {
-    setPinDir('b', i, 0);
-    setPinPort('b', i, 0);
+  for (var x of ['b', 'c', 'd']) {
+    setAll8(setPinDir, x, 0);
+    setAll8(setPinPort, x, 0);
   }
   equs = [];
 }
+
+var devPorts = {
+  'attiny13a': {
+    'pins-b': [0x17, 0x18, 0x16],
+    'pins-c': false,
+    'pins-d': false
+  },
+  'atmega328p': {
+    'pins-b': [0x4, 0x5, 0x3],
+    'pins-c': [0x7, 0x8, 0x6],
+    'pins-d': [0xA, 0xB, 0x9]
+  },
+  'other': {
+    'pins-b': false,
+    'pins-c': false,
+    'pins-d': false
+  }
+};
 
 var cmdParams = {
   'add': ['r', 'r'],
@@ -122,6 +140,8 @@ var executors = {
   'brne': () => jumpTo(cmd[1], !getFlag('z')),
 };
 
+var ioPortFuncs = [];
+
 function execLine(tr) {
   var opcode = tr.getAttribute("cmd");
   cmd = cmdSplit(tr.children[1].innerText, cmdParams[opcode].length);
@@ -156,18 +176,9 @@ function getFlag(f) {
 }
 
 function portWrite(which, value) {
-  var f = null;
-  var p;
-  switch (which) {
-    case 0x24: f = setPinDir; p = 'b'; break;
-    case 0x25: f = setPinPort; p = 'b'; break;
-  }
-  if (f !== null) {
-    for (var i = 0; i < 8; i++) {
-      f(p, i, value & 1);
-      value >>= 1;
-    }
-  }
+  var f = ioPortFuncs[which];
+  if (f !== undefined)
+    f(value);
 }
 
 function portRead(which) {
@@ -211,6 +222,21 @@ function pinTableRows(port) {
   return document.getElementById('pins-' + port).firstElementChild.children;
 }
 
+function setAll8(func, port, value) {
+  for (var i = 0; i < 8; i++) {
+    func(port, i, value & 1);
+    value >>= 1;
+  }
+}
+
+function getAll8(func, port) {
+    var res = 0;
+    for (var i = 0; i < 8; i++) {
+      res |= func(port, i) << 1;
+    }
+    return res;
+}
+
 function setPinDir(port, num, state) {
   pinTableRows(port)[2].children[8-num].innerText = state;
   updPinVal(port, num, state, getPinPort(port, num));
@@ -247,6 +273,25 @@ function updPinVal(port, num, dir, p) {
   }
   pinTableRows(port)[4].children[8-num].innerText = v;
   pinTableRows(port)[1].children[8-num].style.backgroundColor = c;
+}
+
+function setupPorts(descr) {
+  ioPortFuncs = [];
+  var portNames = ['DDR', 'PORT', 'PIN'];
+  for (let key in descr) {
+    var addrs = descr[key];
+    let letter = key.substr(-1).toUpperCase();
+    var pinTable = document.getElementById(key);
+    var rows = pinTable.firstElementChild.children;
+    pinTable.hidden = !addrs;
+    if (addrs) {
+      for (var i = 0; i < 3; i++) {
+        rows[i + 2].children[0].innerText = portNames[i] + letter + ' 0x' + addrs[i].toString(16).toUpperCase();
+      }
+      ioPortFuncs[addrs[0]] = (v) => setAll8(setPinDir, letter.toLowerCase(), v);
+      ioPortFuncs[addrs[1]] = (v) => setAll8(setPinPort, letter.toLowerCase(), v);
+    }
+  }
 }
 
 function addLine(where) {
@@ -292,6 +337,7 @@ var verifiers = {
   '.device': deviceVerifier,
   '.org': orgVerifier,
   '.equ': equVerifier,
+  ':': labelVerifier,
   'add': () => twoRegsVerifier('добавляет значение из регистра ' + cmd[2] + ' к регистру ' + cmd[1]),
   'adc': () => twoRegsVerifier('добавляет значение из регистра ' + cmd[2] + ' и флаг переноса (C) к регистру ' + cmd[1]),
   'mov': () => twoRegsVerifier('копирует значение из регистра ' + cmd[2] + ' в регистр ' + cmd[1]),
@@ -311,23 +357,26 @@ var verifiers = {
 
 function verifyCodeLine(elem, line) {
   var firstSpace = line.indexOf(' ');
-  var firstWord = firstSpace >= 0 ? line.substring(0, firstSpace) : line;
+  var firstWord = line;
+  var tail = '';
+  if (firstSpace > 0) {
+    firstWord = line.substring(0, firstSpace);
+    tail = line.substring(firstSpace+1);
+  } else if (firstWord.substr(-1) == ':') {
+    tail = firstWord.substr(0, firstWord.length-1);
+    firstWord = ':';
+  }
   firstWord = firstWord.toLowerCase();
   var verifier = verifiers[firstWord];
-  var isCmd = firstWord[0] != '.';
-  if (verifier === undefined) {
-    if (firstSpace == -1 && line[line.length-1] == ':')
-      verifier = labelVerifier;
-    else
-      verifier = unknownVerifier;
-    isCmd = false;
-  }
+  var isCmd = firstWord[0] >= 'A';
+  if (verifier === undefined)
+    verifier = unknownVerifier;
   var color = '';
   var text = '';
   try {
     if (isCmd)
         cmd = cmdSplit(line, cmdParams[firstWord].length);
-    text = verifier(line);
+    text = verifier(tail);
   } catch (e) {
     text = e;
     color = 'red';
@@ -371,30 +420,39 @@ var unknownFunnyMsgs = [
   'йа красивенько сообщенько об ошибочке',
 ];
 
-function unknownVerifier(line) {
+function unknownVerifier() {
   throw unknownFunnyMsgs[Math.floor(unknownFunnyMsgs.length * Math.random())];
 }
 
-function labelVerifier(line) {
-  return 'метка "' + line.substring(0, line.length-1) + '"';
+function labelVerifier(param) {
+  var found = findLabel(param);
+  var next = findLabel(param, found + 1);
+  if (next > 0)
+    throw 'дублирующаяся метка: ' + param;
+  return 'метка "' + param + '"';
 }
 
-function deviceVerifier(line) {
-  return 'модель контроллера для уточнения допустимых команд';
+function deviceVerifier(param) {
+  var ports = devPorts[param.toLowerCase()];
+  if (ports === undefined) {
+    param += '- незнакомая';
+    ports = devPorts['other'];
+  }
+  setupPorts(ports);
+  return 'модель контроллера для уточнения допустимых команд: ' + param;
 }
 
-function orgVerifier(line) {
-  var parts = line.split(/\s+/);
-  if (parts.length != 2)
+function orgVerifier(param) {
+  if (param.split(/\s+/).length != 2)
     throw 'нужен один параметр (адрес)';
-  var addr = parseIntVal(parts[1]);
+  var addr = parseIntVal(param);
   if (Number.isNaN(addr) || addr < 0 || addr % 2)
     throw 'адрес должен быть положительным чётным числом';
-  return 'последующие команды записывать с адреса ' + addr;
+  return 'далее продолжать с адреса: ' + param;
 }
 
-function equVerifier(line) {
-  var parts = line.replace(/^\S+\s*/, '').split(/\s*=\s*/);
+function equVerifier(param) {
+  var parts = param.split(/\s*=\s*/);
   if (parts.length != 2 || parts[0] == '' || parts[1] == '')
     return 'нужно определение вида "константа = значение"';
   return 'задаёт константу "' + parts[0] + '" равную ' + parts[1];
@@ -412,11 +470,14 @@ function regAndImmVerifier(msg) {
   return msg;
 }
 
-function findLabel(s) {
+function findLabel(s, startRow) {
+  s = s.toLowerCase();
+  if (startRow === undefined)
+    startRow = 1;
   var rows = tableProg.firstElementChild.children;
-  for (var i = 1; i < rows.length; i++) {
+  for (var i = startRow; i < rows.length; i++) {
     var c = rows[i].children[1].innerText;
-    if (c[c.length-1] == ':' && c.substr(0, c.length-1) == s)
+    if (c[c.length-1] == ':' && c.substr(0, c.length-1).toLowerCase() == s)
       return i;
   }
   return -1;
