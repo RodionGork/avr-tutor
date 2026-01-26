@@ -13,6 +13,7 @@
     #regs td { text-align: center}
     .pins td:not(:first-child) { text-align: center}
     table { width: 100%}
+    pre { text-align: left}
     .moveit { text-decoration: none; text-weight: bold}
     input { text-align: center}
     @media screen and (orientation: landscape) {
@@ -56,27 +57,27 @@
   <table id="pins-b" class="pins" border="1">
     <tr><th>&nbsp;</th><th>7</th><th>6</th><th>5</th><th>4</th><th>3</th><th>2</th><th>1</th><th>0</th></td>
     <tr><td><b>LEDS</b></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
-    <tr><td>DDRB 0x24</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
-    <tr><td>PORTB 0x25</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
-    <tr><td>PINB 0x23</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+    <tr><td>DDRB ?</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+    <tr><td>PORTB ?</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+    <tr><td>PINB ?</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
     <tr><td><b>Buttons</b></td><td>X</td><td>X</td><td>X</td><td>X</td><td>X</td><td>X</td><td>X</td><td>X</td></tr>
   </table>
   <br/><br/>
   <table id="pins-c" class="pins" border="1">
     <tr><th>&nbsp;</th><th>7</th><th>6</th><th>5</th><th>4</th><th>3</th><th>2</th><th>1</th><th>0</th></td>
     <tr><td><b>LEDS</b></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
-    <tr><td>DDRB 0x24</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
-    <tr><td>PORTB 0x25</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
-    <tr><td>PINB 0x23</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+    <tr><td>DDRC 0x24</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+    <tr><td>PORTC 0x25</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+    <tr><td>PINC 0x23</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
     <tr><td><b>Buttons</b></td><td>X</td><td>X</td><td>X</td><td>X</td><td>X</td><td>X</td><td>X</td><td>X</td></tr>
   </table>
   <br/><br/>
   <table id="pins-d" class="pins" border="1">
     <tr><th>&nbsp;</th><th>7</th><th>6</th><th>5</th><th>4</th><th>3</th><th>2</th><th>1</th><th>0</th></td>
     <tr><td><b>LEDS</b></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
-    <tr><td>DDRB 0x24</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
-    <tr><td>PORTB 0x25</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
-    <tr><td>PINB 0x23</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+    <tr><td>DDRD ?</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+    <tr><td>PORTD ?</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+    <tr><td>PIND ?</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
     <tr><td><b>Buttons</b></td><td>X</td><td>X</td><td>X</td><td>X</td><td>X</td><td>X</td><td>X</td><td>X</td></tr>
   </table>
 </div>
@@ -85,14 +86,16 @@
   <h3>Settings</h3>
   <label>Run delay: <input type="text" id="run-delay" value="100"/></label>
   <br/><br/>
-  <button onclick="beepCodeOut()">Beep-beep-beep!</button>
-  &nbsp;&nbsp;&nbsp;
-  <label>volume: <input size="5" type="text" id="beep-volume" value="50"/> %</label>
+  Online Uploader: <input type="text" id="online-uploader"/>
+  <button onclick="onlineUpload()">Send to Server!</button>
+  <br/>
+  <pre id="result-console"></pre>
 </div>
 
 </center>
 
 <script src="./avrtutor.js"></script>
-<script src="./beep.js"></script>
+<script src="./avra.js"></script>
+<script src="./avrawrap.js"></script>
 </body>
 </html>

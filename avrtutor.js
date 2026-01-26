@@ -602,14 +602,6 @@ window.onbeforeunload = function() {
     localStorage['prg'] = prg;
 }
 
-function beepCodeOut() {
-  var prg = collectCode();
-  var vol = document.getElementById('beep-volume').value;
-  if (Number.isNaN(vol) || vol < 1 || vol > 100)
-    vol = 50;
-  doBeep(prg, vol / 100);
-}
-
 function reloadProgram() {
   var lines = localStorage['prg'];
   if (lines === undefined)
@@ -659,6 +651,7 @@ function decoratePage() {
       ' <sub><a href="#" class="moveit">v</a></sub>';
   }
   for (var elem of document.getElementsByClassName('moveit')) elem.onclick = moveit;
+  setupPorts(devPorts['other']);
 }
 
 decoratePage();
