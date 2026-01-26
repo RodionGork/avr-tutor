@@ -1,11 +1,13 @@
 var tableProg = document.getElementById('prg');
 var tableRegs = document.getElementById('regs');
 var equs = [];
+var stack = [];
+var curLine = null;
 
 function btnStep(reset) {
   var rows = tableProg.firstElementChild.children;
   var firstCmd = null;
-  var curLine = null;
+  curLine = null;
   for (var i = 1; i < rows.length; i++) {
     if (rows[i].getAttribute("cmd") !== null) {
       if (firstCmd === null)
@@ -84,6 +86,7 @@ function resetState() {
     setAll8(setPinPort, x, 0);
   }
   equs = [];
+  stack = [];
 }
 
 var devPorts = {
@@ -116,10 +119,12 @@ var cmdParams = {
   'in': ['r', 'p'],
   'out': ['p', 'r'],
   'rjmp': ['l'],
+  'rcall': ['l'],
   'breq': ['l'],
   'brne': ['l'],
   'brsh': ['l'],
   'brlo': ['l'],
+  'ret': [],
 };
 
 var executors = {
@@ -138,6 +143,8 @@ var executors = {
   'brsh': () => jumpTo(cmd[1], !getFlag('c')),
   'breq': () => jumpTo(cmd[1], getFlag('z')),
   'brne': () => jumpTo(cmd[1], !getFlag('z')),
+  'rcall': () => { stack.push(curLine+1); return jumpTo(cmd[1]); },
+  'ret': () => { return stack.pop() - 1; }
 };
 
 var ioPortFuncs = [];
@@ -349,10 +356,12 @@ var verifiers = {
   'in': () => { checkReg(1); checkPort(2); return 'читает значение из порта ' + cmd[2] + ' в регистр ' + cmd[1]; },
   'out': () => { checkPort(1); checkReg(2); return 'пишет значение из регистра ' + cmd[2] + ' в порт ' + cmd[1]; },
   'rjmp': () => jumpVerifier(''),
+  'rcall': () => jumpVerifier(' с сохранением адреса возврата'),
   'breq': () => jumpVerifier(' если равно (Z=0)'),
   'brne': () => jumpVerifier(' если не равно (Z=1)'),
   'brsh': () => jumpVerifier(' если равно или больше (C=0)'),
   'brlo': () => jumpVerifier(' если меньше (C=1)'),
+  'ret': () => 'возврат из подпрограммы по сохранённому адресу',
 };
 
 function verifyCodeLine(elem, line) {
@@ -602,17 +611,29 @@ function beepCodeOut() {
 }
 
 function reloadProgram() {
-  var row = tableProg.firstElementChild.children[1];
   var lines = localStorage['prg'];
   if (lines === undefined)
     return;
   lines = lines.split('\n');
+  var row = tableProg.firstElementChild.children[1];
   for (var i = 0; i < lines.length; i++) {
     var value = lines[i];
     var elem = row.children[1];
-    elem.innerText = value;
-    verifyCodeLine(elem, value);
+    if (value.substr(-1) == ':') {
+      elem.innerText = value;
+      verifyCodeLine(elem, value);
+    }
     addLine();
+    row = row.nextElementSibling;
+  }
+  row = tableProg.firstElementChild.children[1];
+  for (var i = 0; i < lines.length; i++) {
+    var value = lines[i];
+    var elem = row.children[1];
+    if (value.substr(-1) != ':') {
+      elem.innerText = value;
+      verifyCodeLine(elem, value);
+    }
     row = row.nextElementSibling;
   }
 }
