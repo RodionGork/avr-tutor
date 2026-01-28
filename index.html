@@ -19,6 +19,12 @@
     @media screen and (orientation: landscape) {
       .container { width: 800px}
     }
+    #barcoder { height: 300px; overflow: hidden; border: 1px solid #bbb; }
+    .color4 { background: #000; }
+    .color3 { background: #555; }
+    .color2 { background: #999; }
+    .color1 { background: #ccc; }
+    .color0 { background: #fff; }
 }  </style>
 </head>
 <body>
@@ -91,7 +97,65 @@
   <br/>
   <pre id="result-console"></pre>
 </div>
+<hr/>
+<div class="container">
+<h4>Bar-loader test area</h4>
+<input type="text" id="bar-msg" placeholder="Some Text"/><br/><br/>
+<button onclick="barloader()">Bombs Away!</button>
+<input type="checkbox" id="widegaps">wide gaps</input>
+<input type="checkbox" id="widebars">wide bars</input>
+<input type="checkbox" id="slowbars">slower</input>
+<br/><br/>
+<div id="barcoder">
+</div>
+</div>
 
+<script>
+
+var ht = 36;
+var hg;
+var bc = document.getElementById('barcoder');
+var speed;
+
+function bar(v) {
+  var h = v >= 0 ? ht : hg;
+  return `<div style="height:${h}px" class="color${(v+1)}"></div>`;
+}
+
+function lead() {
+  var h = bc.clientHeight - ht;
+  return `<div style="height:${h}px"></div>`;
+}
+
+function barloader() {
+  ht = document.getElementById('widebars').checked ? 90 : 36;
+  speed = ht / (document.getElementById('slowbars').checked ? 8 : 4);
+  hg = document.getElementById('widegaps').checked ? ht*3/2 : ht/2;
+  var html = lead();
+  for (let i = 0; i < 4; i++)
+    html += bar(3-i) + bar(-1);
+  var msg = document.getElementById('bar-msg').value + '\n';
+  for (let i = 0; i < msg.length; i++) {
+    var c = msg.charCodeAt(i);
+    for (let b = 6; b >= 0; b -= 2) {
+      html += bar((c>>b)&3) + bar(-1);
+    }
+  }
+  html += lead();
+  bc.innerHTML = html;
+  bc.scrollTo(0, 0);
+  window.startTime = new Date().getTime();
+  setTimeout(barScroll, 1000);
+}
+
+function barScroll() {
+  var prevPos = bc.scrollTop;
+  bc.scrollTo(0, bc.scrollTop + speed);
+  if (bc.scrollTop > prevPos)
+    setTimeout(barScroll, 20);
+}
+
+</script>
 </center>
 
 <script src="./avrtutor.js"></script>
