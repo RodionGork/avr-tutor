@@ -381,8 +381,10 @@ function verifyCodeLine(elem, line) {
   firstWord = firstWord.toLowerCase();
   var verifier = verifiers[firstWord];
   var isCmd = firstWord[0] >= 'A';
-  if (verifier === undefined)
+  if (verifier === undefined) {
     verifier = unknownVerifier;
+    isCmd = false;
+  }
   var color = '';
   var text = '';
   try {

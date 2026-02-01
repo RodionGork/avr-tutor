@@ -95,17 +95,37 @@
   Online Uploader: <input type="text" id="online-uploader"/>
   <button onclick="onlineUpload()">Send to Server!</button>
   <br/>
-  <pre id="result-console"></pre>
 </div>
 <hr/>
 <div class="container">
-<h4>Bar-loader test area</h4>
-<input type="text" id="bar-msg" placeholder="Some Text"/><br/><br/>
-<button onclick="barloader()">Bombs Away!</button>
-<input type="checkbox" id="widegaps">wide gaps</input>
-<input type="checkbox" id="widebars">wide bars</input>
-<input type="checkbox" id="slowbars">slower</input>
+<h4>Bar-burner</h4>
+<button id="burnit" onclick="barloader()">BURN</button>
 <br/><br/>
+Gaps:
+<select id="widegaps">
+  <option value="1">norm</option>
+  <option value="2">wide</option>
+  <option value="3">insane</option>
+</select>
+&nbsp;
+Bars:
+<select id="widebars">
+  <option value="36">slim</option>
+  <option value="54">good</option>
+  <option value="72">plump</option>
+</select>
+&nbsp;
+Speed:
+<select id="slowbars">
+  <option value="4">swift</option>
+  <option value="6">decent</option>
+  <option value="8">slow</option>
+  <option value="12">crawl</option>
+</select>
+&nbsp;
+<button onclick="bartest()">Test</button>
+<br/><br/>
+<pre id="result-console"></pre>
 <div id="barcoder">
 </div>
 </div>
@@ -127,20 +147,25 @@ function lead() {
   return `<div style="height:${h}px"></div>`;
 }
 
-function barloader() {
-  ht = document.getElementById('widebars').checked ? 90 : 36;
-  speed = ht / (document.getElementById('slowbars').checked ? 8 : 4);
-  hg = document.getElementById('widegaps').checked ? ht*3/2 : ht/2;
+function bartest() {
+  var msg = prompt('Some text:');
+  if (msg == null)
+    return;
+  msg += '\n';
+  barsend([...msg].map((c) => c.charCodeAt(0)));
+}
+
+function barsend(data) {
+  document.getElementById('burnit').innerText = 'STOP';
+  ht = document.getElementById('widebars').value * 1;
+  speed = Math.floor(ht / document.getElementById('slowbars').value);
+  hg = document.getElementById('widegaps').value * ht / 2;
   var html = lead();
   for (let i = 0; i < 4; i++)
     html += bar(3-i) + bar(-1);
-  var msg = document.getElementById('bar-msg').value + '\n';
-  for (let i = 0; i < msg.length; i++) {
-    var c = msg.charCodeAt(i);
-    for (let b = 6; b >= 0; b -= 2) {
+  for (let c of data)
+    for (let b = 6; b >= 0; b -= 2)
       html += bar((c>>b)&3) + bar(-1);
-    }
-  }
   html += lead();
   bc.innerHTML = html;
   bc.scrollTo(0, 0);
@@ -151,8 +176,28 @@ function barloader() {
 function barScroll() {
   var prevPos = bc.scrollTop;
   bc.scrollTo(0, bc.scrollTop + speed);
-  if (bc.scrollTop > prevPos)
-    setTimeout(barScroll, 20);
+  if (bc.scrollTop > prevPos && document.getElementById('burnit').innerText == 'STOP')
+    requestAnimationFrame(barScroll);
+  else {
+    console.log('load time: ' + (new Date().getTime() - window.startTime));
+    document.getElementById('burnit').innerText = 'BURN';
+  }
+}
+
+function barloader() {
+  if (document.getElementById('burnit').innerText == 'STOP') {
+    document.getElementById('burnit').innerText = '----';
+    return;
+  }
+  var prg = collectCode();
+  var res = build(prg);
+  var con = document.getElementById('result-console');
+  if (!res[1]) {
+    con.innerText = res[0];
+    alert('Please see compilation errors below');
+    return;
+  }
+  barsend(res[0]);
 }
 
 </script>

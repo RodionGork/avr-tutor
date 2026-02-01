@@ -20,35 +20,62 @@ function build(src) {
         if (('' + e.message).indexOf('exit(0)') == -1) {
             return [e.message + '\r\n' + output, false];
         }
-        console.log('completed normally');
     }
     var s = '';
     FS.readFile('/test.hex').forEach((v)=>{s+=String.fromCharCode(v)});
-    return [s, true];
+    return convertHexOutput(s);
 }
 
-function onlineUpload() {
-  var prg = collectCode();
-  var res = build(prg);
-  var con = document.getElementById('result-console');
-  var srv = document.getElementById('online-uploader').value;
-  if (!res[1]) {
-    con.innerText = res[0];
-    alert('Please see compilation errors below');
-    return;
+function convertHexOutput(data) {
+    var bytes = [];
+    outer:
+    for (var str of data.split('\n').map(s => s.trim())) {
+        if (str == '')
+            continue;
+        if (str[0] != ':')
+            return ['line format error', false];
+        var b = [];
+        for (var i = 1; i < str.length - 2; i+=2)
+            b.push(parseInt(str.substr(i, 2), 16));
+        switch (b[3]) {
+            case 2:
+                break;
+            case 0:
+                bytes.push(...(b.slice(4)));
+                break;
+            case 1:
+                break outer;
+        }
+    }
+    var res = [];
+    res.push(bytes.length | (bytes.length > 127 ? 0x80 : 0));
+    if (bytes.length > 127) {
+        res[0] = (res[0] & 0x7F) | 0x80;
+        res.push(bytes.length >> 7);
+    }
+    console.log(checksum(bytes).join(':'));
+    var ab = [0, 0];
+    for (var i = 0; i < bytes.length; i++) {
+        res.push(bytes[i]);
+        ab = checksum(bytes.slice(i, i+1), ...ab);
+        if (i % 8 == 7)
+            res.push(ab[1]);
+    }
+    res.push(...ab);
+    console.log(`checksum: ${ab[0]}:${ab[1]}`);
+    return [res, true];
+}
+
+function checksum(msg, a, b) {
+  if (typeof(msg) == 'string')
+    msg = [...msg].map((c) => c.charCodeAt(0));
+  if (a === undefined) a = 0;
+  if (b === undefined) b = 0
+  for (var c of msg) {
+    a = ((a << 1) & 0xFF) | (a >> 7);
+    a ^= c;
+    b ^= a;
   }
-  if (srv.trim() == '') {
-    alert('Please specify server url');
-    con.innerText = res[0];
-    return;
-  }
-  fetch(srv+'/store.php', {method:'POST', body: res[0]})
-    .then((res) => {
-      if (!res.ok)
-        throw new 'Result is not OK: ' + res.status;
-      return res.text();
-    })
-    .then((text) => {con.innerText = text;})
-    .catch((e) => {con.innerText = 'Error on sending data: ' + e;});
+  return [a, b];
 }
 
