@@ -124,6 +124,8 @@ Speed:
 </select>
 &nbsp;
 <button onclick="bartest()">Test</button>
+&nbsp;
+<span id="bar-info"></span>
 <br/><br/>
 <pre id="result-console"></pre>
 <div id="barcoder">
@@ -174,12 +176,14 @@ function barsend(data) {
 }
 
 function barScroll() {
+  var info = document.getElementById('bar-info');
   var prevPos = bc.scrollTop;
   bc.scrollTo(0, bc.scrollTop + speed);
+  info.innerText = Math.floor(bc.scrollTop / bc.scrollHeight * 100) + '%';
   if (bc.scrollTop > prevPos && document.getElementById('burnit').innerText == 'STOP')
     requestAnimationFrame(barScroll);
   else {
-    console.log('load time: ' + (new Date().getTime() - window.startTime));
+    info.innerText = Math.floor((new Date().getTime() - window.startTime) / 100) / 10 + 's';
     document.getElementById('burnit').innerText = 'BURN';
   }
 }
