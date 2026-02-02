@@ -1,5 +1,3 @@
-.device atmega328p
-
 .def Xl = r26
 .def Xh = r27
 .def Yl = r28
@@ -24,20 +22,57 @@
 .def prgcntl = r24
 .def prgcnth = r25
 
-.equ DDRB = 0x04
-.equ PORTB = 0x05
+.equ m328 = 0
+
+.if m328
+
+.device atmega328p
+
 .equ DDRC = 0x07
 .equ PORTC = 0x08
 .equ ADMUX_ADDR = 0x7C
 .equ ADCSRA_ADDR = 0x7A
 .equ ADCL_ADDR = 0x78
 .equ ADCH_ADDR = 0x79
+.equ SPMCSR = 0x37
 .equ SREG = 0x3F
+
+.equ PAGE_SIZE_WORDS = 64
 
 .org 0x3800
 
+.else
+
+.device atmega8
+
+.equ DDRC = 0x14
+.equ PORTC = 0x15
+.equ ADMUX_ADDR = 0x27
+.equ ADCSRA_ADDR = 0x26
+.equ ADCL_ADDR = 0x24
+.equ ADCH_ADDR = 0x25
+.equ SPMCSR = 0x37
+.equ SPL = 0x3D
+.equ SPH = 0x3E
+.equ SPL_init = 0x60
+.equ SPH_init = 0x04
+.equ SREG = 0x3F
+
+.equ PAGE_SIZE_WORDS = 32
+
+.org 0xC00
+
+.endif
+
 ;===================
 start:
+
+.ifdef SPL_init
+ldi r16, SPL_init
+out SPL, r16
+ldi r16, SPH_init
+out SPH, r16
+.endif
 
 rcall init_hw
 
@@ -46,6 +81,12 @@ first_wait:
 rcall next_measure
 dec temp
 brne first_wait
+
+cpi avg, 0xC0
+brlo bootloader_proceed
+rjmp normal_boot
+
+bootloader_proceed:
 
 ldi temp, 17
 add temp, avg
@@ -56,7 +97,7 @@ cp temp, avg
 brsh wait_rise
 
 mov curmax, avg
-sbi PORTB, 0
+sbi PORTC, 1
 ldi Xl, LEVEL0_ADDR+LEVELS
 ldi Xh, 0
 
@@ -112,6 +153,7 @@ rcall read_byte
 cp r1, temp
 breq prg_fill_next
 rjmp err_rept
+
 prg_fill_done:
 
 rcall read_byte
@@ -126,6 +168,35 @@ breq checksum_2_ok
 ldi temp, 2
 rjmp err_rept
 checksum_2_ok:
+
+ldi Zl, 0
+ldi Zh, 0
+ldi Yl, 0
+ldi Yh, 1
+ldi temp, 0
+
+burn_loop:
+ld r0, Y+
+ld r1, Y+
+ldi r16, 1
+out SPMCSR, r16
+spm
+adiw Zl, 2
+cp Zl, prgszl
+cpc Zh, prgszh
+brsh burn_end
+inc temp
+cpi temp, PAGE_SIZE_WORDS
+brlo burn_loop
+rcall burn_page
+rjmp burn_loop
+
+burn_end:
+cpi temp, 0
+breq no_tail_page
+rcall burn_page
+no_tail_page:
+
 ldi temp, 0xC3
 rjmp err_rept
 
@@ -162,6 +233,31 @@ pop r16
 ret
 
 ;===================
+burn_page:
+push Zl
+push Zh
+sbiw Zl, 2
+andi Zl, PAGE_SIZE_WORDS*2
+ldi r16, 0b11
+out SPMCSR, r16
+spm
+burn_page_wait_erase:
+in r16, SPMCSR
+andi r16, 1
+brne burn_page_wait_erase
+ldi r16, 0b101
+out SPMCSR, r16
+spm
+burn_page_wait_write:
+in r16, SPMCSR
+andi r16, 1
+brne burn_page_wait_write
+clr temp
+pop Zh
+pop Zl
+ret
+
+;===================
 init_hw:
 clr Yh
 ldi Yl, ADMUX_ADDR
@@ -172,6 +268,19 @@ ldi r16, 0b11100011 ; enable, start, autorun, 32 divisor (free-running in ADCSRB
 st Y, r16
 sbi PORTC, 0
 ret
+
+;===================
+normal_boot:
+ldi Yl, ADMUX_ADDR
+ldi r16, 0
+st Y, r16
+ldi Yl, ADCSRA_ADDR
+ldi r16, 0
+st Y, r16
+cbi PORTC, 0
+clr Zl
+clr Zh
+ijmp
 
 ;===================
 ; avgH:avgL = (avg*3 + adc) >> 2
@@ -212,14 +321,14 @@ ret
 ; returns in r16 (0 - no peak)
 peak_detect:
 rcall next_measure
-sbis PORTB, 0
+sbis PORTC, 1
 rjmp pd_falling
 cp curmax, avg
 brlo pd_update
 subi avg, -3
 cp avg, curmax
 brsh pd_ret0
-cbi PORTB, 0
+cbi PORTC, 1
 mov r16, curmax
 ret
 pd_falling:
@@ -228,7 +337,7 @@ brlo pd_update
 subi avg, 3
 cp avg, curmax
 brlo pd_ret0
-sbi PORTB, 0
+sbi PORTC, 1
 rjmp pd_ret0
 pd_update:
 mov curmax, avg
@@ -237,9 +346,9 @@ ldi r16, 0
 ret
 
 ;===================
-; dbgreg to blink via pb0
+; dbgreg to blink via pc1
 debug:
-sbi DDRB, 0
+sbi DDRC, 1
 push temp
 push r19
 ldi temp, 8
@@ -249,9 +358,9 @@ lsl dbgreg
 brcs debug_1
 ldi r19, 20
 debug_1:
-sbi PORTB, 0
+sbi PORTC, 1
 rcall mdelay
-cbi PORTB, 0
+cbi PORTC, 1
 ldi r19, 40
 rcall mdelay
 dec temp
