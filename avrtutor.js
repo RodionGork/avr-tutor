@@ -58,11 +58,21 @@ function btnRun() {
   if (state == 'Run') {
     btn.innerText = 'Stop';
     window.runner = function() {
-      if (!btnStep())
-        btnRun();
+      var delay = parseFloat(document.getElementById('run-delay').value);
+      var delay = (!Number.isNaN(delay) && delay > 0 && delay <= 5000) ? delay : 100;
+      var sumDelay = 0;
+      var succ = true;
+      do {
+        succ = succ && btnStep();
+        sumDelay += delay;
+      } while (sumDelay < 1 && succ);
+      if (!succ)
+        btnRun(); // simulate second click to stop
       if (window.runner !== undefined) {
-        var delay = parseInt(document.getElementById('run-delay').value);
-        setTimeout(window.runner, (!Number.isNaN(delay) && delay > 0 && delay <= 5000) ? delay : 100);
+        if (delay > 10)
+          setTimeout(window.runner, delay);
+        else
+          requestAnimationFrame(runner);          
       }
     }
     window.runner();
@@ -191,13 +201,9 @@ function portWrite(which, value) {
 }
 
 function portRead(which) {
-  if (which == 0x23) {
-    var res = 0;
-    for (var i = 0; i < 8; i++) {
-      res |= getPinVal('b', i) << 1;
-    }
-    return res;
-  }
+  var f = ioPortFuncs[which];
+  if (f !== undefined)
+    return f();
   return 0;
 }
 
@@ -241,7 +247,7 @@ function setAll8(func, port, value) {
 function getAll8(func, port) {
     var res = 0;
     for (var i = 0; i < 8; i++) {
-      res |= func(port, i) << 1;
+      res |= func(port, i) << i;
     }
     return res;
 }
@@ -299,6 +305,7 @@ function setupPorts(descr) {
       }
       ioPortFuncs[addrs[0]] = (v) => setAll8(setPinDir, letter.toLowerCase(), v);
       ioPortFuncs[addrs[1]] = (v) => setAll8(setPinPort, letter.toLowerCase(), v);
+      ioPortFuncs[addrs[2]] = () => getAll8(getPinVal, letter.toLowerCase());
     }
   }
 }
