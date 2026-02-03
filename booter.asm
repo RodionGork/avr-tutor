@@ -8,13 +8,13 @@
 .def avgL = r2
 .def avgH = r3
 .def curmax = r5
-.def dbgreg = r6
 .equ LEVEL0_ADDR = 8
 .def level0 = r8
 .def level1 = r9
 .def level2 = r10
 .def level3 = r11
 .equ LEVELS = 4
+.def dbgreg = r16
 .def temp = r20
 .def avg = r21
 .def prgszl = r22
@@ -22,9 +22,15 @@
 .def prgcntl = r24
 .def prgcnth = r25
 
-.equ m328 = 0
+.equ LED_BIT = 0
+.equ ADC_BIT = 1
+.equ PWR_BIT = 2
+
+.equ m328 = 1
 
 .if m328
+
+; fuses 07 D8 62
 
 .device atmega328p
 
@@ -42,6 +48,8 @@
 .org 0x3800
 
 .else
+
+; fuses (ff) D8 E1
 
 .device atmega8
 
@@ -88,6 +96,9 @@ rjmp normal_boot
 
 bootloader_proceed:
 
+ldi dbgreg, 0b00000010
+rcall debug
+
 ldi temp, 17
 add temp, avg
 
@@ -97,7 +108,7 @@ cp temp, avg
 brsh wait_rise
 
 mov curmax, avg
-sbi PORTC, 1
+sbi PORTC, LED_BIT
 ldi Xl, LEVEL0_ADDR+LEVELS
 ldi Xh, 0
 
@@ -152,21 +163,22 @@ brne prg_fill_next
 rcall read_byte
 cp r1, temp
 breq prg_fill_next
-rjmp err_rept
+ldi dbgreg, 0b01001100
+rcall debug
 
 prg_fill_done:
 
 rcall read_byte
 cp r0, temp
 breq checksum_1_ok
-ldi temp, 1
-rjmp err_rept
+ldi dbgreg, 0b00101100
+rcall debug
 checksum_1_ok:
 rcall read_byte
 cp r1, temp
 breq checksum_2_ok
-ldi temp, 2
-rjmp err_rept
+ldi dbgreg, 0b00011100
+rcall debug
 checksum_2_ok:
 
 ldi Zl, 0
@@ -197,13 +209,8 @@ breq no_tail_page
 rcall burn_page
 no_tail_page:
 
-ldi temp, 0xC3
-rjmp err_rept
-
-err_rept:
-mov dbgreg, temp
+ldi dbgreg, 0b00001011
 rcall debug
-rjmp err_rept
 
 ;===================
 ; returns in temp
@@ -261,12 +268,14 @@ ret
 init_hw:
 clr Yh
 ldi Yl, ADMUX_ADDR
-ldi r16, 0b1000000 ; avcc as ref, adc0, right-adjusted
+ldi r16, 0b1000000 + ADC_BIT ; avcc as ref, right-adjusted
 st Y, r16
 ldi Yl, ADCSRA_ADDR
 ldi r16, 0b11100011 ; enable, start, autorun, 32 divisor (free-running in ADCSRB by default)
 st Y, r16
-sbi PORTC, 0
+sbi PORTC, ADC_BIT
+sbi DDRC, PWR_BIT
+sbi PORTC, PWR_BIT
 ret
 
 ;===================
@@ -277,7 +286,8 @@ st Y, r16
 ldi Yl, ADCSRA_ADDR
 ldi r16, 0
 st Y, r16
-cbi PORTC, 0
+cbi PORTC, ADC_BIT
+cbi PORTC, PWR_BIT
 clr Zl
 clr Zh
 ijmp
@@ -321,14 +331,14 @@ ret
 ; returns in r16 (0 - no peak)
 peak_detect:
 rcall next_measure
-sbis PORTC, 1
+sbis PORTC, LED_BIT
 rjmp pd_falling
 cp curmax, avg
 brlo pd_update
 subi avg, -3
 cp avg, curmax
 brsh pd_ret0
-cbi PORTC, 1
+cbi PORTC, LED_BIT
 mov r16, curmax
 ret
 pd_falling:
@@ -337,7 +347,7 @@ brlo pd_update
 subi avg, 3
 cp avg, curmax
 brlo pd_ret0
-sbi PORTC, 1
+sbi PORTC, LED_BIT
 rjmp pd_ret0
 pd_update:
 mov curmax, avg
@@ -348,28 +358,34 @@ ret
 ;===================
 ; dbgreg to blink via pc1
 debug:
-sbi DDRC, 1
+sbi DDRC, LED_BIT
+push dbgreg
 push temp
-push r19
-ldi temp, 8
+mov temp, dbgreg
+andi temp, 0b111
 debug_next:
-ldi r19, 50
+ldi r19, 40
 lsl dbgreg
 brcs debug_1
-ldi r19, 20
+ldi r19, 10
 debug_1:
-sbi PORTC, 1
+sbi PORTC, LED_BIT
 rcall mdelay
-cbi PORTC, 1
-ldi r19, 40
+cbi PORTC, LED_BIT
+ldi r19, 25
 rcall mdelay
 dec temp
 brne debug_next
+pop temp
+pop dbgreg
+bst dbgreg, 3
+brts debug_endless
+cbi DDRC, LED_BIT
+ret
+debug_endless:
 ldi r19, 70
 rcall mdelay
-pop r19
-pop temp
-ret
+rjmp debug
 
 ;===================
 ; r19 as param (1 = 10 millis)
