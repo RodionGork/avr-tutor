@@ -122,6 +122,25 @@ var devPorts = {
   }
 };
 
+function tableOrArea() {
+  var area = document.getElementById('prgarea');
+  if (event.target.checked) {
+    tableProg.classList.add('hidden');
+    area.classList.remove('hidden');
+    var code = localStorage['prg'];
+    area.value = code;
+    area.setAttribute('rows', code.split('\n').length+1);
+  } else {
+    tableProg.classList.remove('hidden');
+    area.classList.add('hidden');
+    localStorage['prg'] = area.value.trim();
+    var rows = tableProg.firstElementChild.children;
+    for (var i = rows.length - 2; i > 0; i--)
+        rows[i].remove();
+    reloadProgram();
+  }
+}
+
 var cmdParams = {
   'add': ['r', 'r'],
   'adc': ['r', 'r'],
@@ -345,6 +364,7 @@ function tableClick() {
     if (elem.parentElement.nextElementSibling !== null) {
       elem.parentElement.remove();
       recalcAddrs();
+      saveToLocalStorage();
     }
     return;
   }
@@ -352,6 +372,7 @@ function tableClick() {
   if (elem.parentElement.nextElementSibling === null)
     addLine();
   verifyCodeLine(elem, value);
+  saveToLocalStorage();
 }
 
 var verifiers = {
@@ -613,7 +634,7 @@ function collectCode() {
   return prg.join('\n');
 }
 
-window.onbeforeunload = function() {
+function saveToLocalStorage() {
   var prg = collectCode();
   if (prg.length > 0)
     localStorage['prg'] = prg;
