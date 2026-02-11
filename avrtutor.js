@@ -151,6 +151,11 @@ var cmdParams = {
   'sub': ['r', 'r'],
   'subi': ['r', 'i'],
   'sbci': ['r', 'i'],
+  'lsl': ['r'],
+  'lsr': ['r'],
+  'asr': ['r'],
+  'rol': ['r'],
+  'ror': ['r'],
   'in': ['r', 'p'],
   'out': ['p', 'r'],
   'rjmp': ['l'],
@@ -172,6 +177,11 @@ var executors = {
   'sbci': () => subReg(cmd[1], parseIntVal(cmd[2]) + getFlag('c')),
   'cp': () => subReg(cmd[1], getReg(cmd[2]), false),
   'cpi': () => subReg(cmd[1], parseIntVal(cmd[2]), false),
+  'lsl': () => addReg(cmd[1], getReg(cmd[1])),
+  'lsr': () => shiftReg(cmd[1], 0),
+  'rol': () => addReg(cmd[1], getReg(cmd[1]) + getFlag('c')),
+  'ror': () => shiftReg(cmd[1], getFlag('c')),
+  'asr': () => shiftReg(cmd[1], getReg(cmd[1]) >> 7),
   'out': () => portWrite(parseIntVal(cmd[1]), getReg(cmd[2])),
   'in': () => setReg(cmd[1], portRead(parseIntVal(cmd[2]))),
   'rjmp': () => jumpTo(cmd[1]),
@@ -247,6 +257,15 @@ function subReg(which, value, write) {
   setFlag('z', res == 0);
   if (write !== false)
     setReg(which, res);
+  return null;
+}
+
+function shiftReg(which, msb) {
+  var res = getReg(which);
+  setFlag('c', res & 1);
+  res = ((res >> 1) | (msb << 7));
+  setReg(which, (res >> 1) | (msb << 7));
+  setFlag('z', res == 0 ? 1 : 0);
   return null;
 }
 
@@ -389,6 +408,11 @@ var verifiers = {
   'sub': () => twoRegsVerifier('вычитает значение регистра ' + cmd[2] + ' из регистра ' + cmd[1]),
   'subi': () => regAndImmVerifier('вычитает число ' + cmd[2] + ' из регистра ' + cmd[1]),
   'sbci': () => regAndImmVerifier('вычитает число ' + cmd[2] + ' и флаг переноса (C) из регистра ' + cmd[1]),
+  'lsl': () => oneRegVerifier('сдвигает регистр ' + cmd[1] + ' влево'),
+  'lsr': () => oneRegVerifier('сдвигает регистр ' + cmd[1] + ' вправо'),
+  'rol': () => oneRegVerifier('циклически сдвигает регистр ' + cmd[1] + ' влево (через C)'),
+  'lsr': () => oneRegVerifier('циклически сдвигает регистр ' + cmd[1] + ' вправо (через С)'),
+  'asr': () => oneRegVerifier('арифметически сдвигает регистр ' + cmd[1] + ' вправо'),
   'in': () => { checkReg(1); checkPort(2); return 'читает значение из порта ' + cmd[2] + ' в регистр ' + cmd[1]; },
   'out': () => { checkPort(1); checkReg(2); return 'пишет значение из регистра ' + cmd[2] + ' в порт ' + cmd[1]; },
   'rjmp': () => jumpVerifier(''),
@@ -514,6 +538,11 @@ function twoRegsVerifier(msg) {
 function regAndImmVerifier(msg) {
   checkReg(1, true);
   checkImm();
+  return msg;
+}
+
+function oneRegVerifier(msg) {
+  checkReg(1);
   return msg;
 }
 
@@ -644,7 +673,7 @@ function reloadProgram() {
   var lines = localStorage['prg'];
   if (lines === undefined)
     return;
-  lines = lines.split('\n');
+  lines = lines.split('\n').map((s) => s.trim()).filter((s) => s != '');
   var row = tableProg.firstElementChild.children[1];
   for (var i = 0; i < lines.length; i++) {
     var value = lines[i];
