@@ -94,6 +94,7 @@ function resetState() {
   for (var x of ['b', 'c', 'd']) {
     setAll8(setPinDir, x, 0);
     setAll8(setPinPort, x, 0);
+    setAll8(setPinBtn, x, false);
   }
   equs = [];
   stack = [];
@@ -151,6 +152,11 @@ var cmdParams = {
   'sub': ['r', 'r'],
   'subi': ['r', 'i'],
   'sbci': ['r', 'i'],
+  'and': ['r', 'r'],
+  'andi': ['r', 'i'],
+  'or': ['r', 'r'],
+  'ori': ['r', 'i'],
+  'eor': ['r', 'r'],
   'lsl': ['r'],
   'lsr': ['r'],
   'asr': ['r'],
@@ -177,6 +183,11 @@ var executors = {
   'sbci': () => subReg(cmd[1], parseIntVal(cmd[2]) + getFlag('c')),
   'cp': () => subReg(cmd[1], getReg(cmd[2]), false),
   'cpi': () => subReg(cmd[1], parseIntVal(cmd[2]), false),
+  'and': () => setRegZ(cmd[1], getReg(cmd[1]) & getReg(cmd[2])),
+  'andi': () => setRegZ(cmd[1], getReg(cmd[1]) & parseIntVal(cmd[2])),
+  'or': () => setRegZ(cmd[1], getReg(cmd[1]) | getReg(cmd[2])),
+  'ori': () => setRegZ(cmd[1], getReg(cmd[1]) | parseIntVal(cmd[2])),
+  'eor': () => setRegZ(cmd[1], getReg(cmd[1]) ^ getReg(cmd[2])),
   'lsl': () => addReg(cmd[1], getReg(cmd[1])),
   'lsr': () => shiftReg(cmd[1], 0),
   'rol': () => addReg(cmd[1], getReg(cmd[1]) + getFlag('c')),
@@ -204,6 +215,12 @@ function execLine(tr) {
 function setReg(which, value) {
   which = parseInt(which.substr(1));
   tableRegs.firstElementChild.children[Math.floor(which / 4)].children[which % 4 + 1].innerText = value;
+  return null;
+}
+
+function setRegZ(which, value) {
+  setReg(which, value);
+  setFlag('z', value == 0);
   return null;
 }
 
@@ -320,17 +337,36 @@ function getPinVal(port, num) {
   return parseInt(v);
 }
 
+function setPinBtn(port, num, state) {
+  pinTableRows(port)[5].children[8-num].innerText = (state ? 'C' : 'X');
+  updPinVal(port, num, getPinDir(port, num), state);
+}
+
+function getPinBtn(port, num) {
+  return pinTableRows(port)[5].children[8-num].innerText;
+}
+
 function updPinVal(port, num, dir, p) {
   var v, c;
+  var b = (getPinBtn(port, num) == 'C');
   if (dir == 1) {
     v = p;
-    c = (p == 1) ? '#0f0' : '';
-  } else {
+    if (b) {
+      alert('КЗ! подали плюс на ногу с включённой на минус кнопкой!'); 
+      c = '#f00';
+    } else {
+      c = (p == 1) ? '#0f0' : '';
+    }
+  } else if (!b) {
     v = p ? '1' : '?';
     c = (p == 1) ? '#262' : '#888';
+  } else {
+    v = '0';
+    c = '';
   }
   pinTableRows(port)[4].children[8-num].innerText = v;
   pinTableRows(port)[1].children[8-num].style.backgroundColor = c;
+  pinTableRows(port)[5].children[8-num].style.backgroundColor = (b ? '#adf' : '');
 }
 
 function setupPorts(descr) {
@@ -351,6 +387,25 @@ function setupPorts(descr) {
       ioPortFuncs[addrs[2]] = () => getAll8(getPinVal, letter.toLowerCase());
     }
   }
+}
+
+function btnRowClicked(port) {
+  var elem = event.target;
+  var pin = 8;
+  for (let cur = elem.previousElementSibling; cur !== null; cur = cur.previousElementSibling)
+    pin--;
+  if (pin > 7) return;
+  if (elem.innerText == 'X') {
+    elem.innerText = 'C';
+    var dir = getPinDir(port, pin);
+    var v = getPinPort(port, pin);
+    if (dir == '1' && v == '1') {
+      alert('КЗ! кнопка закоротила на минус ногу выдающую плюс');
+    }
+  } else {
+    elem.innerText = 'X';
+  }
+  updPinVal(port, pin, getPinDir(port, pin), getPinPort(port, pin));
 }
 
 function addLine(where) {
@@ -408,6 +463,11 @@ var verifiers = {
   'sub': () => twoRegsVerifier('вычитает значение регистра ' + cmd[2] + ' из регистра ' + cmd[1]),
   'subi': () => regAndImmVerifier('вычитает число ' + cmd[2] + ' из регистра ' + cmd[1]),
   'sbci': () => regAndImmVerifier('вычитает число ' + cmd[2] + ' и флаг переноса (C) из регистра ' + cmd[1]),
+  'and': () => twoRegsVerifier('побитовое И в регистр ' + cmd[1] + ' регистра ' + cmd[2]),
+  'andi': () => regAndImmVerifier('побитовое И в регистр ' + cmd[1] + ' значения ' + cmd[2]),
+  'or': () => twoRegsVerifier('побитовое ИЛИ в регистр ' + cmd[1] + ' регистра ' + cmd[2]),
+  'ori': () => regAndImmVerifier('побитовое ИЛИ в регистр ' + cmd[1] + ' значения ' + cmd[2]),
+  'eor': () => twoRegsVerifier('побитовое исключающее-ИЛИ в регистр ' + cmd[1] + ' регистра ' + cmd[2]),
   'lsl': () => oneRegVerifier('сдвигает регистр ' + cmd[1] + ' влево'),
   'lsr': () => oneRegVerifier('сдвигает регистр ' + cmd[1] + ' вправо'),
   'rol': () => oneRegVerifier('циклически сдвигает регистр ' + cmd[1] + ' влево (через C)'),
