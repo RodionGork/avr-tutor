@@ -312,6 +312,12 @@ function getAll8(func, port) {
     return res;
 }
 
+function setOrGetAll8(funcSet, funcGet, port, value) {
+  if (value === undefined)
+    return getAll8(funcGet, port);
+  setAll8(funcSet, port, value);
+}
+
 function setPinDir(port, num, state) {
   pinTableRows(port)[2].children[8-num].innerText = state;
   updPinVal(port, num, state, getPinPort(port, num));
@@ -383,7 +389,7 @@ function setupPorts(descr) {
         rows[i + 2].children[0].innerText = portNames[i] + letter + ' 0x' + addrs[i].toString(16).toUpperCase();
       }
       ioPortFuncs[addrs[0]] = (v) => setAll8(setPinDir, letter.toLowerCase(), v);
-      ioPortFuncs[addrs[1]] = (v) => setAll8(setPinPort, letter.toLowerCase(), v);
+      ioPortFuncs[addrs[1]] = (v) => setOrGetAll8(setPinPort, getPinPort, letter.toLowerCase(), v);
       ioPortFuncs[addrs[2]] = () => getAll8(getPinVal, letter.toLowerCase());
     }
   }
@@ -477,8 +483,8 @@ var verifiers = {
   'out': () => { checkPort(1); checkReg(2); return 'пишет значение из регистра ' + cmd[2] + ' в порт ' + cmd[1]; },
   'rjmp': () => jumpVerifier(''),
   'rcall': () => jumpVerifier(' с сохранением адреса возврата'),
-  'breq': () => jumpVerifier(' если равно (Z=0)'),
-  'brne': () => jumpVerifier(' если не равно (Z=1)'),
+  'breq': () => jumpVerifier(' если равно (Z=1)'),
+  'brne': () => jumpVerifier(' если не равно (Z=0)'),
   'brsh': () => jumpVerifier(' если равно или больше (C=0)'),
   'brlo': () => jumpVerifier(' если меньше (C=1)'),
   'ret': () => 'возврат из подпрограммы по сохранённому адресу',
